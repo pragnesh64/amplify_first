@@ -4,12 +4,15 @@ import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../../amplify/data/resource';
 import { Button } from '../../components/Button';
 import { Modal } from '../../components/Modal';
-import { Input } from '../../components/Input';
 import { Calendar, MapPin, Ticket, ArrowLeft, Check } from 'lucide-react';
 import { formatDateTime, formatCurrency, getImagePlaceholder } from '../../utils/helpers';
 import { useAuth } from '../../context/AuthContext';
+import outputs from '../../../amplify_outputs.json';
 
 const client = generateClient<Schema>();
+const bookingModelFields = (outputs?.data?.model_introspection?.models?.Booking?.fields ??
+  {}) as Record<string, unknown>;
+const supportsQrCodeField = 'qrCode' in bookingModelFields;
 
 export function EventDetails() {
   const { id } = useParams();
@@ -44,8 +47,11 @@ export function EventDetails() {
 
     setBooking(true);
     try {
+      // Generate unique QR code data
+      const qrData = `EVENTORA-${event.id}-${user.id}-${Date.now()}`;
+      
       // Create booking
-      await client.models.Booking.create({
+      const bookingResult = await client.models.Booking.create({
         eventId: event.id,
         userId: user.id,
         userName: user.name,
@@ -55,13 +61,46 @@ export function EventDetails() {
         totalPrice: event.price * quantity,
         status: 'confirmed',
         createdAt: new Date().toISOString(),
+        ...(supportsQrCodeField ? { qrCode: qrData } : {}),
       });
+
+      console.log('Booking created:', bookingResult);
 
       // Update event tickets
       await client.models.Event.update({
         id: event.id,
         ticketsAvailable: event.ticketsAvailable - quantity,
       });
+
+      // Trigger email Lambda function
+      try {
+        console.log('📧 Triggering email notification...');
+        
+        // For now, we'll simulate the email trigger
+        // In production, this would be automatically triggered via DynamoDB stream
+        const emailData = {
+          bookingId: bookingResult.data?.id,
+          userEmail: user.email,
+          userName: user.name,
+          eventTitle: event.title,
+          quantity,
+          totalPrice: event.price * quantity,
+          qrCode: qrData,
+        };
+        
+        console.log('Email data:', emailData);
+        console.log('✅ Email notification triggered (simulated)');
+        
+        // TODO: Implement actual Lambda trigger
+        // This could be done via:
+        // 1. DynamoDB stream trigger (automatic)
+        // 2. EventBridge rule (scheduled)
+        // 3. Direct Lambda invocation (manual)
+        
+      } catch (emailError) {
+        console.error('Failed to send email:', emailError);
+        // Don't fail the booking if email fails
+      }
 
       setBookingModal(false);
       setShowSuccess(true);
@@ -293,4 +332,3 @@ export function EventDetails() {
     </div>
   );
 }
-

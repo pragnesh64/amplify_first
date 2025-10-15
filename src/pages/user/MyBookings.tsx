@@ -3,17 +3,25 @@ import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../../amplify/data/resource';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
-import { Ticket, Calendar, MapPin, X } from 'lucide-react';
+import { Modal } from '../../components/Modal';
+import { QRCodeGenerator } from '../../components/QRCodeGenerator';
+import { Ticket, Calendar, MapPin, X, QrCode } from 'lucide-react';
 import { formatDateTime, formatCurrency } from '../../utils/helpers';
 import { useAuth } from '../../context/AuthContext';
+import outputs from '../../../amplify_outputs.json';
 
 const client = generateClient<Schema>();
+const bookingModelFields = (outputs?.data?.model_introspection?.models?.Booking?.fields ??
+  {}) as Record<string, unknown>;
+const supportsQrCodeField = 'qrCode' in bookingModelFields;
 
 export function MyBookings() {
   const { user } = useAuth();
   const [bookings, setBookings] = useState<any[]>([]);
   const [events, setEvents] = useState<Map<string, any>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
 
   useEffect(() => {
     fetchBookings();
@@ -102,7 +110,12 @@ export function MyBookings() {
       <div className="container-custom py-12">
         {/* Active Bookings */}
         <div className="mb-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Active Bookings</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">Active Bookings</h2>
+          {!supportsQrCodeField && (
+            <div className="mb-6 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+              QR codes will be attached to your tickets once the backend upgrade that adds QR support is deployed.
+            </div>
+          )}
           
           {activeBookings.length === 0 ? (
             <Card>
@@ -158,19 +171,34 @@ export function MyBookings() {
 
                       <div className="border-t pt-4">
                         <div className="flex justify-between mb-2">
-                          <span className="text-gray-600">Tickets</span>
+                          <span className="text-muted">Tickets</span>
                           <span className="font-semibold">{booking.quantity}</span>
                         </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-600">Total Paid</span>
-                          <span className="font-bold text-primary-600">
+                        <div className="flex justify-between mb-4">
+                          <span className="text-muted">Total Paid</span>
+                          <span className="font-bold text-primary">
                             {formatCurrency(booking.totalPrice)}
                           </span>
                         </div>
+                        
+                        {supportsQrCodeField && booking.qrCode && (
+                          <Button
+                            fullWidth
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedBooking(booking);
+                              setShowQRModal(true);
+                            }}
+                          >
+                            <QrCode className="w-4 h-4" />
+                            View QR Ticket
+                          </Button>
+                        )}
                       </div>
 
                       {isPast && (
-                        <div className="mt-4 p-2 bg-gray-100 rounded text-center text-sm text-gray-600">
+                        <div className="mt-4 p-2 bg-muted rounded text-center text-sm text-muted">
                           Event has ended
                         </div>
                       )}
@@ -217,7 +245,38 @@ export function MyBookings() {
           </div>
         )}
       </div>
+
+      {/* QR Code Modal */}
+      {selectedBooking && (
+        <Modal
+          isOpen={showQRModal}
+          onClose={() => {
+            setShowQRModal(false);
+            setSelectedBooking(null);
+          }}
+          title="Your Ticket QR Code"
+          size="md"
+        >
+          <div className="text-center space-y-4">
+            <div className="p-4 bg-muted rounded-lg">
+              <h3 className="text-xl font-bold mb-2">{selectedBooking.eventTitle}</h3>
+              <p className="text-sm text-muted">
+                Tickets: {selectedBooking.quantity} • {formatCurrency(selectedBooking.totalPrice)}
+              </p>
+            </div>
+            
+            <QRCodeGenerator
+              value={selectedBooking.qrCode}
+              eventTitle={selectedBooking.eventTitle}
+              size={250}
+            />
+            
+            <p className="text-sm text-muted">
+              Show this QR code at the event entrance for validation
+            </p>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
-

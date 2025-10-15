@@ -1,18 +1,25 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../../amplify/data/resource';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
-import { Calendar, MapPin, Ticket, Users } from 'lucide-react';
+import { Calendar, MapPin, Ticket, Search, SlidersHorizontal, X } from 'lucide-react';
 import { formatDate, formatCurrency, getImagePlaceholder } from '../../utils/helpers';
 
 const client = generateClient<Schema>();
+
+type SortOption = 'date-asc' | 'date-desc' | 'price-asc' | 'price-desc' | 'popularity';
 
 export function Home() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>('date-asc');
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -33,13 +40,63 @@ export function Home() {
     }
   };
 
-  const filteredEvents = filter === 'all' 
-    ? events 
-    : events.filter(event => event.category === filter);
+  const filteredAndSortedEvents = useMemo(() => {
+    let filtered = events.filter(event => new Date(event.date) > new Date());
 
-  const upcomingEvents = filteredEvents.filter(
-    event => new Date(event.date) > new Date()
-  );
+    // Category filter
+    if (filter !== 'all') {
+      filtered = filtered.filter(event => event.category.toLowerCase() === filter);
+    }
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(event => 
+        event.title.toLowerCase().includes(query) ||
+        event.description.toLowerCase().includes(query) ||
+        event.location.toLowerCase().includes(query)
+      );
+    }
+
+    // Price range filter
+    filtered = filtered.filter(event => 
+      event.price >= priceRange[0] && event.price <= priceRange[1]
+    );
+
+    // Date range filter
+    if (dateRange.start) {
+      filtered = filtered.filter(event => 
+        new Date(event.date) >= new Date(dateRange.start)
+      );
+    }
+    if (dateRange.end) {
+      filtered = filtered.filter(event => 
+        new Date(event.date) <= new Date(dateRange.end)
+      );
+    }
+
+    // Sorting
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case 'date-asc':
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
+        case 'date-desc':
+          return new Date(b.date).getTime() - new Date(a.date).getTime();
+        case 'price-asc':
+          return a.price - b.price;
+        case 'price-desc':
+          return b.price - a.price;
+        case 'popularity':
+          return (b.totalTickets - b.ticketsAvailable) - (a.totalTickets - a.ticketsAvailable);
+        default:
+          return 0;
+      }
+    });
+
+    return sorted;
+  }, [events, filter, searchQuery, priceRange, dateRange, sortBy]);
+
+  const upcomingEvents = filteredAndSortedEvents;
 
   const categories = ['All', 'Conference', 'Workshop', 'Meetup', 'Concert', 'Sports', 'Other'];
 
@@ -65,7 +122,128 @@ export function Home() {
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Search Bar */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="container-custom py-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Search Input */}
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <input
+                type="text"
+                placeholder="Search events by name, location, or description..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="input pl-10 w-full"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              )}
+            </div>
+
+            {/* Filter Toggle */}
+            <Button
+              variant={showFilters ? 'primary' : 'secondary'}
+              onClick={() => setShowFilters(!showFilters)}
+            >
+              <SlidersHorizontal className="w-4 h-4" />
+              Filters
+            </Button>
+          </div>
+
+          {/* Advanced Filters */}
+          {showFilters && (
+            <div className="mt-6 p-6 bg-gray-50 rounded-lg space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                {/* Sort By */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Sort By</label>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as SortOption)}
+                    className="input w-full"
+                  >
+                    <option value="date-asc">Date (Earliest First)</option>
+                    <option value="date-desc">Date (Latest First)</option>
+                    <option value="price-asc">Price (Low to High)</option>
+                    <option value="price-desc">Price (High to Low)</option>
+                    <option value="popularity">Popularity</option>
+                  </select>
+                </div>
+
+                {/* Date Range */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Date From</label>
+                  <input
+                    type="date"
+                    value={dateRange.start}
+                    onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                    className="input w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Date To</label>
+                  <input
+                    type="date"
+                    value={dateRange.end}
+                    onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                    className="input w-full"
+                  />
+                </div>
+              </div>
+
+              {/* Price Range */}
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Price Range: ${priceRange[0]} - ${priceRange[1]}
+                </label>
+                <div className="flex gap-4 items-center">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1000"
+                    value={priceRange[0]}
+                    onChange={(e) => setPriceRange([parseInt(e.target.value), priceRange[1]])}
+                    className="flex-1"
+                  />
+                  <input
+                    type="range"
+                    min="0"
+                    max="1000"
+                    value={priceRange[1]}
+                    onChange={(e) => setPriceRange([priceRange[0], parseInt(e.target.value)])}
+                    className="flex-1"
+                  />
+                </div>
+              </div>
+
+              {/* Reset Filters */}
+              <div className="flex justify-end">
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSortBy('date-asc');
+                    setPriceRange([0, 1000]);
+                    setDateRange({ start: '', end: '' });
+                    setFilter('all');
+                  }}
+                >
+                  Reset All Filters
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Category Filters */}
       <div className="bg-white shadow-sm sticky top-16 z-30">
         <div className="container-custom py-4">
           <div className="flex gap-3 overflow-x-auto">
@@ -86,13 +264,25 @@ export function Home() {
         </div>
       </div>
 
+      {/* Results Count */}
+      <div className="container-custom pt-6">
+        <p className="text-sm text-gray-600">
+          Showing <span className="font-semibold">{upcomingEvents.length}</span> event{upcomingEvents.length !== 1 ? 's' : ''}
+          {searchQuery && ` for "${searchQuery}"`}
+        </p>
+      </div>
+
       {/* Events Grid */}
-      <div className="container-custom py-12">
+      <div className="container-custom py-6 pb-12">
         {upcomingEvents.length === 0 ? (
           <div className="text-center py-20">
             <Calendar className="w-16 h-16 mx-auto text-gray-400 mb-4" />
             <h3 className="text-2xl font-semibold text-gray-600 mb-2">No Events Found</h3>
-            <p className="text-gray-500">Check back later for upcoming events!</p>
+            <p className="text-gray-500">
+              {searchQuery || filter !== 'all' || dateRange.start || dateRange.end
+                ? 'Try adjusting your filters or search query'
+                : 'Check back later for upcoming events!'}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -161,4 +351,3 @@ export function Home() {
     </div>
   );
 }
-
