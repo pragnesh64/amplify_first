@@ -4,8 +4,13 @@ import type { Schema } from '../../../amplify/data/resource';
 import { Camera, CheckCircle, XCircle, Loader2, ScanLine } from 'lucide-react';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
+import outputs from '../../../amplify_outputs.json';
 
 const client = generateClient<Schema>();
+const bookingFields = (outputs?.data?.model_introspection?.models?.Booking?.fields ??
+  {}) as Record<string, unknown>;
+const supportsQrCodeField = 'qrCode' in bookingFields;
+const supportsUsedAtField = 'usedAt' in bookingFields;
 
 interface ScanResult {
   success: boolean;
@@ -91,14 +96,28 @@ export function ScanTickets() {
   };
 
   const validateTicket = async (qrCode: string) => {
+    if (!supportsQrCodeField) {
+      setScanResult({
+        success: false,
+        message:
+          'QR validation is unavailable until the backend update that stores QR codes is deployed.',
+      });
+      setIsValidating(false);
+      setManualQrCode('');
+      return;
+    }
+
     setIsValidating(true);
     setScanResult(null);
 
     try {
       // Query the booking by QR code
-      const { data: bookings } = await client.models.Booking.list({
-        filter: { qrCode: { eq: qrCode } },
-      });
+      const listParams = supportsQrCodeField
+        ? ({ filter: { qrCode: { eq: qrCode } } } as Parameters<
+            typeof client.models.Booking.list
+          >[0])
+        : undefined;
+      const { data: bookings } = await client.models.Booking.list(listParams);
 
       if (!bookings || bookings.length === 0) {
         setScanResult({
@@ -109,12 +128,15 @@ export function ScanTickets() {
       }
 
       const booking = bookings[0];
+      const usedAtValue = supportsUsedAtField ? (booking as any).usedAt : undefined;
 
       // Check if ticket is already used
       if (booking.status === 'used') {
         setScanResult({
           success: false,
-          message: `Ticket already used${booking.usedAt ? ` at ${new Date(booking.usedAt).toLocaleString()}` : ''}`,
+          message: `Ticket already used${
+            usedAtValue ? ` at ${new Date(usedAtValue).toLocaleString()}` : ''
+          }`,
           booking: {
             eventTitle: booking.eventTitle,
             userName: booking.userName,
@@ -146,7 +168,7 @@ export function ScanTickets() {
       await client.models.Booking.update({
         id: booking.id,
         status: 'used',
-        usedAt: new Date().toISOString(),
+        ...(supportsUsedAtField ? { usedAt: new Date().toISOString() } : {}),
       });
 
       setScanResult({
@@ -206,6 +228,13 @@ export function ScanTickets() {
         <h1 className="text-3xl font-bold mb-2">🎫 Scan Tickets</h1>
         <p className="text-muted">Validate event tickets with QR code scanning</p>
       </div>
+
+      {!supportsQrCodeField && (
+        <div className="mb-6 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+          QR validation tools will become available after the backend update that stores ticket QR codes.
+          Until then, use the booking list to manage attendees.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Camera Scanner */}
