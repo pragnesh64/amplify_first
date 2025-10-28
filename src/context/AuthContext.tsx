@@ -62,7 +62,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             id: currentUser.userId,
             email: newUser.data.email || '',
             name: newUser.data.name || '',
-            role: 'user',
+            role: isAdmin ? 'admin' : 'user',
           });
         }
       }
@@ -99,4 +99,3 @@ export function useAuth() {
   }
   return context;
 }
-
