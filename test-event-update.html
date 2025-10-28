@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Event Update API</title>
+    <script src="https://unpkg.com/@aws-amplify/core@6.6.6/dist/aws-amplify-core.min.js"></script>
+    <script src="https://unpkg.com/aws-amplify@6.6.6/dist/aws-amplify.min.js"></script>
+</head>
+<body>
+    <h1>Test Event Update API</h1>
+    <button onclick="testUpdate()">Test Update Event</button>
+    <button onclick="testList()">Test List Events</button>
+    <div id="result"></div>
+
+    <script>
+        // Configure Amplify with your outputs
+        const outputs = {
+            "version": "1",
+            "auth": {
+                "user_pool_id": "ap-south-1_ZnQvCae8v",
+                "user_pool_client_id": "6g8rg43pe41ie7vtjvmm74jsmr",
+                "identity_pool_id": "ap-south-1:your-identity-pool-id"
+            },
+            "data": {
+                "url": "https://i33umv4fevdy3drap7v64htozy.appsync-api.ap-south-1.amazonaws.com/graphql",
+                "region": "ap-south-1",
+                "default_authorization_type": "AMAZON_COGNITO_USER_POOLS"
+            }
+        };
+
+        Amplify.configure(outputs);
+
+        async function testUpdate() {
+            try {
+                const client = generateClient();
+                
+                const updateData = {
+                    id: 'b51660f5-6e5f-47ad-82a3-7463034bc2a9',
+                    title: 'Hello Updated Test',
+                    description: 'Updated description test',
+                    date: new Date('2025-10-22T03:50').toISOString(),
+                    location: 'ahmedabad',
+                    totalTickets: 120,
+                    price: 20,
+                    category: 'Meetup',
+                    imageUrl: 'https://images.unsplash.com/photo-1620121692029-d088224ddc74?ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&q=80&w=2064'
+                };
+
+                console.log('Updating event with data:', updateData);
+                const result = await client.models.Event.update(updateData);
+                
+                document.getElementById('result').innerHTML = 
+                    '<h3>Update Success!</h3><pre>' + JSON.stringify(result, null, 2) + '</pre>';
+                    
+            } catch (error) {
+                console.error('Update failed:', error);
+                document.getElementById('result').innerHTML = 
+                    '<h3>Update Failed!</h3><pre>' + JSON.stringify(error, null, 2) + '</pre>';
+            }
+        }
+
+        async function testList() {
+            try {
+                const client = generateClient();
+                const result = await client.models.Event.list();
+                
+                document.getElementById('result').innerHTML = 
+                    '<h3>List Success!</h3><p>Found ' + result.data.length + ' events</p><pre>' + 
+                    JSON.stringify(result.data, null, 2) + '</pre>';
+                    
+            } catch (error) {
+                console.error('List failed:', error);
+                document.getElementById('result').innerHTML = 
+                    '<h3>List Failed!</h3><pre>' + JSON.stringify(error, null, 2) + '</pre>';
+            }
+        }
+    </script>
+</body>
+</html>

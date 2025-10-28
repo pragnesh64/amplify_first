@@ -15,13 +15,13 @@ export function Button({
   className = '', 
   ...props 
 }: ButtonProps) {
-  const baseStyles = 'font-semibold rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
+  const baseStyles = 'font-semibold transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed';
   
   const variants = {
-    primary: 'bg-primary-600 text-white hover:bg-primary-700 shadow-md hover:shadow-lg',
-    secondary: 'bg-gray-200 text-gray-800 hover:bg-gray-300',
-    danger: 'bg-red-600 text-white hover:bg-red-700',
-    outline: 'border-2 border-primary-600 text-primary-600 hover:bg-primary-50',
+    primary: 'text-white',
+    secondary: 'bg-gray-200 text-gray-800 hover:bg-gray-300 rounded-lg',
+    danger: 'bg-red-600 text-white hover:bg-red-700 rounded-lg',
+    outline: 'border-2 border-primary-600 text-primary-600 hover:bg-primary-50 rounded-lg',
   };
 
   const sizes = {
@@ -31,6 +31,20 @@ export function Button({
   };
 
   const widthClass = fullWidth ? 'w-full' : '';
+
+  // Special gradient container for primary buttons
+  if (variant === 'primary') {
+    return (
+      <div className={`gradient-button-container ${widthClass} ${className}`}>
+        <button
+          className={`${baseStyles} ${sizes[size]} gradient-button`}
+          {...props}
+        >
+          {children}
+        </button>
+      </div>
+    );
+  }
 
   return (
     <button

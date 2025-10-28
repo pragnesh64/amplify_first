@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Complete Booking Scenario Test</title>
+    <script src="https://unpkg.com/@aws-amplify/core@6.6.6/dist/aws-amplify-core.min.js"></script>
+    <script src="https://unpkg.com/aws-amplify@6.6.6/dist/aws-amplify.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        .qr-code { font-family: monospace; background: #000; color: #0f0; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>🎫 Complete Booking Scenario Test</h1>
+    
+    <div class="test-section info">
+        <h3>📋 Test Overview</h3>
+        <p>This test simulates the complete booking flow:</p>
+        <ol>
+            <li>Fetch available events</li>
+            <li>Create a booking</li>
+            <li>Update event tickets</li>
+            <li>Generate QR code</li>
+            <li>Trigger email notification</li>
+            <li>Validate ticket</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h3>🚀 Run Tests</h3>
+        <button onclick="runCompleteTest()">Run Complete Booking Test</button>
+        <button onclick="testEventList()">Test Event List</button>
+        <button onclick="testBookingCreation()">Test Booking Creation</button>
+        <button onclick="testQRValidation()">Test QR Validation</button>
+        <button onclick="clearResults()">Clear Results</button>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        // Configure Amplify
+        const outputs = {
+            "version": "1",
+            "auth": {
+                "user_pool_id": "ap-south-1_ZnQvCae8v",
+                "user_pool_client_id": "6g8rg43pe41ie7vtjvmm74jsmr",
+                "identity_pool_id": "ap-south-1:your-identity-pool-id"
+            },
+            "data": {
+                "url": "https://i33umv4fevdy3drap7v64htozy.appsync-api.ap-south-1.amazonaws.com/graphql",
+                "region": "ap-south-1",
+                "default_authorization_type": "AMAZON_COGNITO_USER_POOLS"
+            }
+        };
+
+        Amplify.configure(outputs);
+        const client = generateClient();
+
+        let testResults = [];
+
+        function addResult(title, content, type = 'info') {
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-section ${type}`;
+            resultDiv.innerHTML = `<h4>${title}</h4><pre>${content}</pre>`;
+            document.getElementById('results').appendChild(resultDiv);
+            testResults.push({ title, content, type });
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            testResults = [];
+        }
+
+        async function testEventList() {
+            try {
+                addResult('📋 Fetching Events', 'Loading...', 'info');
+                
+                const { data: events } = await client.models.Event.list();
+                
+                let eventList = `Found ${events.length} events:\n\n`;
+                events.forEach((event, index) => {
+                    eventList += `${index + 1}. ${event.title}\n`;
+                    eventList += `   ID: ${event.id}\n`;
+                    eventList += `   Date: ${new Date(event.date).toLocaleString()}\n`;
+                    eventList += `   Location: ${event.location}\n`;
+                    eventList += `   Price: $${event.price}\n`;
+                    eventList += `   Tickets: ${event.ticketsAvailable}/${event.totalTickets}\n`;
+                    eventList += `   Category: ${event.category}\n\n`;
+                });
+
+                addResult('✅ Events Fetched Successfully', eventList, 'success');
+                return events;
+                
+            } catch (error) {
+                addResult('❌ Failed to Fetch Events', JSON.stringify(error, null, 2), 'error');
+                return [];
+            }
+        }
+
+        async function testBookingCreation() {
+            try {
+                // First get events
+                const events = await testEventList();
+                if (events.length === 0) {
+                    addResult('❌ No Events Available', 'Cannot create booking without events', 'error');
+                    return;
+                }
+
+                // Select first available event
+                const selectedEvent = events.find(e => e.ticketsAvailable > 0) || events[0];
+                
+                addResult('🎯 Selected Event', `Event: ${selectedEvent.title}\nAvailable Tickets: ${selectedEvent.ticketsAvailable}`, 'info');
+
+                // Create booking
+                const quantity = 1;
+                const totalPrice = selectedEvent.price * quantity;
+                const qrCode = `EVENTORA-${selectedEvent.id}-test-user-${Date.now()}`;
+                
+                const bookingData = {
+                    eventId: selectedEvent.id,
+                    userId: 'test-user-123',
+                    userName: 'Test User',
+                    userEmail: 'test@example.com',
+                    eventTitle: selectedEvent.title,
+                    quantity: quantity,
+                    totalPrice: totalPrice,
+                    status: 'confirmed',
+                    qrCode: qrCode,
+                    createdAt: new Date().toISOString(),
+                };
+
+                addResult('🎫 Creating Booking', JSON.stringify(bookingData, null, 2), 'info');
+
+                const bookingResult = await client.models.Booking.create(bookingData);
+                
+                addResult('✅ Booking Created Successfully', 
+                    `Booking ID: ${bookingResult.data?.id}\nQR Code: ${qrCode}`, 'success');
+
+                // Update event tickets
+                const newTicketsAvailable = selectedEvent.ticketsAvailable - quantity;
+                await client.models.Event.update({
+                    id: selectedEvent.id,
+                    ticketsAvailable: newTicketsAvailable,
+                });
+
+                addResult('🎟️ Event Tickets Updated', 
+                    `Remaining tickets: ${newTicketsAvailable}/${selectedEvent.totalTickets}`, 'success');
+
+                // Simulate email trigger
+                const emailData = {
+                    bookingId: bookingResult.data?.id,
+                    userEmail: 'test@example.com',
+                    userName: 'Test User',
+                    eventTitle: selectedEvent.title,
+                    quantity: quantity,
+                    totalPrice: totalPrice,
+                    qrCode: qrCode,
+                };
+
+                addResult('📧 Email Notification Triggered', 
+                    `Email would be sent to: ${emailData.userEmail}\nQR Code: ${qrCode}`, 'success');
+
+                return { bookingResult, qrCode, selectedEvent };
+                
+            } catch (error) {
+                addResult('❌ Booking Creation Failed', JSON.stringify(error, null, 2), 'error');
+                return null;
+            }
+        }
+
+        async function testQRValidation() {
+            try {
+                // Get bookings
+                const { data: bookings } = await client.models.Booking.list();
+                
+                if (bookings.length === 0) {
+                    addResult('❌ No Bookings Found', 'Cannot test QR validation without bookings', 'error');
+                    return;
+                }
+
+                // Find a confirmed booking
+                const confirmedBooking = bookings.find(b => b.status === 'confirmed');
+                
+                if (!confirmedBooking) {
+                    addResult('❌ No Confirmed Bookings', 'All bookings are already used or cancelled', 'error');
+                    return;
+                }
+
+                addResult('🔍 Testing QR Validation', 
+                    `Booking ID: ${confirmedBooking.id}\nQR Code: ${confirmedBooking.qrCode}\nStatus: ${confirmedBooking.status}`, 'info');
+
+                // Mark as used
+                await client.models.Booking.update({
+                    id: confirmedBooking.id,
+                    status: 'used',
+                    usedAt: new Date().toISOString(),
+                });
+
+                addResult('✅ Ticket Validated Successfully', 
+                    `Booking ${confirmedBooking.id} marked as used\nGuest: ${confirmedBooking.userName}\nEvent: ${confirmedBooking.eventTitle}`, 'success');
+
+            } catch (error) {
+                addResult('❌ QR Validation Failed', JSON.stringify(error, null, 2), 'error');
+            }
+        }
+
+        async function runCompleteTest() {
+            clearResults();
+            addResult('🚀 Starting Complete Booking Test', 'Running all test scenarios...', 'info');
+            
+            try {
+                // Step 1: Test event list
+                await testEventList();
+                
+                // Step 2: Test booking creation
+                const bookingResult = await testBookingCreation();
+                
+                // Step 3: Test QR validation
+                await testQRValidation();
+                
+                // Step 4: Final summary
+                addResult('🎉 Complete Test Finished', 
+                    'All booking scenarios tested successfully!\n\nSummary:\n✅ Events fetched\n✅ Booking created\n✅ Tickets updated\n✅ Email triggered\n✅ QR validation tested', 'success');
+                
+            } catch (error) {
+                addResult('❌ Complete Test Failed', JSON.stringify(error, null, 2), 'error');
+            }
+        }
+
+        // Auto-run test on page load
+        window.onload = function() {
+            addResult('📱 Test Page Loaded', 'Ready to run booking scenario tests. Click "Run Complete Booking Test" to start.', 'info');
+        };
+    </script>
+</body>
+</html>

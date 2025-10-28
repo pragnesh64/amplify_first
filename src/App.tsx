@@ -5,6 +5,7 @@ import outputs from '../amplify_outputs.json';
 import '@aws-amplify/ui-react/styles.css';
 
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { Navbar } from './components/Navbar';
 
 // User Pages
@@ -16,6 +17,11 @@ import { Profile } from './pages/user/Profile';
 // Admin Pages
 import { Dashboard } from './pages/admin/Dashboard';
 import { ManageEvents } from './pages/admin/ManageEvents';
+import { CreateEvent } from './pages/admin/CreateEvent';
+import { ScanTickets } from './pages/admin/ScanTickets';
+
+// Helper Pages
+import { AdminCheck } from './pages/AdminCheck';
 
 Amplify.configure(outputs);
 
@@ -50,6 +56,10 @@ function AppRoutes() {
           {/* Public Routes */}
           <Route path="/" element={<Home />} />
           <Route path="/event/:id" element={<EventDetails />} />
+          
+          {/* Admin Check Helper */}
+          <Route path="/admin-check" element={<AdminCheck />} />
+          <Route path="/admin-setup" element={<Navigate to="/admin-check" replace />} />
           
           {/* User Routes */}
           <Route
@@ -86,6 +96,30 @@ function AppRoutes() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/admin/events/create"
+            element={
+              <ProtectedRoute adminOnly>
+                <CreateEvent />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/events/edit/:id"
+            element={
+              <ProtectedRoute adminOnly>
+                <CreateEvent />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/scan"
+            element={
+              <ProtectedRoute adminOnly>
+                <ScanTickets />
+              </ProtectedRoute>
+            }
+          />
           
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
@@ -97,13 +131,15 @@ function AppRoutes() {
 
 function App() {
   return (
-    <Authenticator>
-      {() => (
-        <AuthProvider>
-          <AppRoutes />
-        </AuthProvider>
-      )}
-    </Authenticator>
+    <ThemeProvider>
+      <Authenticator>
+        {() => (
+          <AuthProvider>
+            <AppRoutes />
+          </AuthProvider>
+        )}
+      </Authenticator>
+    </ThemeProvider>
   );
 }
 

@@ -1,7 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { Calendar, User, LogOut, LayoutDashboard, Ticket } from 'lucide-react';
+import { Calendar, User, LogOut, LayoutDashboard, Ticket, ScanLine } from 'lucide-react';
 import { signOut } from 'aws-amplify/auth';
 import { useAuth } from '../context/AuthContext';
+import { ThemeToggle } from './ThemeToggle';
 
 export function Navbar() {
   const { user, isAdmin } = useAuth();
@@ -18,58 +19,54 @@ export function Navbar() {
   };
 
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-40">
+    <nav className="navbar">
       <div className="container-custom">
-        <div className="flex items-center justify-between h-16">
+        <div className="navbar-container">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2 text-2xl font-bold text-primary-600">
+          <Link to="/" className="navbar-logo">
             <Calendar className="w-8 h-8" />
             <span>Eventora</span>
           </Link>
 
           {/* Navigation */}
-          <div className="flex items-center space-x-6">
+          <div className="navbar-menu">
             {user && (
               <>
-                <Link
-                  to="/"
-                  className="flex items-center space-x-1 text-gray-700 hover:text-primary-600 transition-colors"
-                >
+                <Link to="/" className="navbar-link">
                   <Calendar className="w-5 h-5" />
                   <span>Events</span>
                 </Link>
 
                 {!isAdmin && (
-                  <Link
-                    to="/bookings"
-                    className="flex items-center space-x-1 text-gray-700 hover:text-primary-600 transition-colors"
-                  >
+                  <Link to="/bookings" className="navbar-link">
                     <Ticket className="w-5 h-5" />
                     <span>My Bookings</span>
                   </Link>
                 )}
 
                 {isAdmin && (
-                  <Link
-                    to="/admin"
-                    className="flex items-center space-x-1 text-gray-700 hover:text-primary-600 transition-colors"
-                  >
-                    <LayoutDashboard className="w-5 h-5" />
-                    <span>Dashboard</span>
-                  </Link>
+                  <>
+                    <Link to="/admin" className="navbar-link">
+                      <LayoutDashboard className="w-5 h-5" />
+                      <span>Dashboard</span>
+                    </Link>
+                    <Link to="/admin/scan" className="navbar-link">
+                      <ScanLine className="w-5 h-5" />
+                      <span>Scan Tickets</span>
+                    </Link>
+                  </>
                 )}
 
-                <Link
-                  to="/profile"
-                  className="flex items-center space-x-1 text-gray-700 hover:text-primary-600 transition-colors"
-                >
+                <Link to="/profile" className="navbar-link">
                   <User className="w-5 h-5" />
                   <span>{user.name}</span>
                 </Link>
 
-                <button
-                  onClick={handleSignOut}
-                  className="flex items-center space-x-1 text-gray-700 hover:text-red-600 transition-colors"
+                <ThemeToggle />
+
+                <button 
+                  onClick={handleSignOut} 
+                  className="navbar-link-signout"
                 >
                   <LogOut className="w-5 h-5" />
                   <span>Sign Out</span>
