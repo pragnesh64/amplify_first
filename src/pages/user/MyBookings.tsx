@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { generateClient } from 'aws-amplify/data';
 import type { Schema } from '../../../amplify/data/resource';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { Modal } from '../../components/Modal';
 import { QRCodeGenerator } from '../../components/QRCodeGenerator';
-import { Ticket, Calendar, MapPin, X, QrCode } from 'lucide-react';
+import { Ticket, Calendar, MapPin, X, QrCode, CheckCircle } from 'lucide-react';
 import { formatDateTime, formatCurrency } from '../../utils/helpers';
 import { useAuth } from '../../context/AuthContext';
 import outputs from '../../../amplify_outputs.json';
@@ -22,6 +22,7 @@ export function MyBookings() {
   const [loading, setLoading] = useState(true);
   const [showQRModal, setShowQRModal] = useState(false);
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [qrSize, setQrSize] = useState(280);
 
   useEffect(() => {
     fetchBookings();
@@ -87,6 +88,58 @@ export function MyBookings() {
     }
   };
 
+  const activeBookings = bookings.filter(b => b.status === 'confirmed');
+  const cancelledBookings = bookings.filter(b => b.status === 'cancelled');
+  const usedBookings = bookings.filter(b => b.status === 'used');
+
+  useEffect(() => {
+    if (!showQRModal || typeof window === 'undefined') return;
+
+    const updateSize = () => {
+      const nextSize = Math.max(240, Math.min(window.innerWidth - 96, 360));
+      setQrSize(nextSize);
+    };
+
+    updateSize();
+    window.addEventListener('resize', updateSize);
+    return () => window.removeEventListener('resize', updateSize);
+  }, [showQRModal]);
+
+  const qrStatus = useMemo(() => {
+    if (!selectedBooking) return null;
+
+    switch (selectedBooking.status) {
+      case 'confirmed':
+        return {
+          label: 'Active',
+          description: 'Present this QR code at the venue. It can be scanned once.',
+          badgeClass: 'bg-green-100 text-green-700',
+          textClass: 'text-green-700',
+        };
+      case 'used':
+        return {
+          label: 'Used',
+          description: 'This ticket has been scanned already and cannot be reused.',
+          badgeClass: 'bg-blue-100 text-blue-700',
+          textClass: 'text-blue-700',
+        };
+      case 'cancelled':
+        return {
+          label: 'Cancelled',
+          description: 'This ticket was cancelled. The QR code is no longer valid.',
+          badgeClass: 'bg-gray-200 text-gray-700',
+          textClass: 'text-gray-600',
+        };
+      default:
+        return {
+          label: selectedBooking.status,
+          description: 'Ticket status updated.',
+          badgeClass: 'bg-gray-200 text-gray-700',
+          textClass: 'text-gray-600',
+        };
+    }
+  }, [selectedBooking]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -94,9 +147,6 @@ export function MyBookings() {
       </div>
     );
   }
-
-  const activeBookings = bookings.filter(b => b.status === 'confirmed');
-  const cancelledBookings = bookings.filter(b => b.status === 'cancelled');
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -192,7 +242,7 @@ export function MyBookings() {
                             }}
                           >
                             <QrCode className="w-4 h-4" />
-                            View QR Ticket
+                            Show QR Code
                           </Button>
                         )}
                       </div>
@@ -209,6 +259,31 @@ export function MyBookings() {
             </div>
           )}
         </div>
+
+        {/* Used Bookings */}
+        {usedBookings.length > 0 && (
+          <div className="mb-12">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Used Tickets</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {usedBookings.map(booking => (
+                <Card key={booking.id} className="border border-blue-100">
+                  <div className="p-6 space-y-4">
+                    <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium inline-flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4" />
+                      Used
+                    </span>
+                    <h3 className="text-xl font-bold text-gray-900">
+                      {booking.eventTitle}
+                    </h3>
+                    <p className="text-sm text-blue-700">
+                      This ticket was already scanned at the venue. QR codes work once and are now marked as used.
+                    </p>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Cancelled Bookings */}
         {cancelledBookings.length > 0 && (
@@ -250,30 +325,65 @@ export function MyBookings() {
       {selectedBooking && (
         <Modal
           isOpen={showQRModal}
+          size="lg"
           onClose={() => {
             setShowQRModal(false);
             setSelectedBooking(null);
           }}
           title="Your Ticket QR Code"
-          size="md"
         >
-          <div className="text-center space-y-4">
-            <div className="p-4 bg-muted rounded-lg">
-              <h3 className="text-xl font-bold mb-2">{selectedBooking.eventTitle}</h3>
-              <p className="text-sm text-muted">
+          <div className="space-y-6">
+            <div className="rounded-xl bg-gray-50 p-4 text-center space-y-2">
+              <h3 className="text-xl font-bold text-gray-900">{selectedBooking.eventTitle}</h3>
+              <p className="text-sm text-gray-600">
                 Tickets: {selectedBooking.quantity} • {formatCurrency(selectedBooking.totalPrice)}
               </p>
+              {qrStatus && (
+                <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold ${qrStatus.badgeClass}`}>
+                  {qrStatus.label}
+                </span>
+              )}
             </div>
-            
-            <QRCodeGenerator
-              value={selectedBooking.qrCode}
-              eventTitle={selectedBooking.eventTitle}
-              size={250}
-            />
-            
-            <p className="text-sm text-muted">
-              Show this QR code at the event entrance for validation
-            </p>
+
+            {qrStatus && (
+              <p className={`text-sm text-center font-medium ${qrStatus.textClass}`}>
+                {qrStatus.description}
+              </p>
+            )}
+
+            <div className="flex justify-center">
+              {supportsQrCodeField && selectedBooking.qrCode ? (
+                <div className="relative p-6 rounded-2xl bg-white shadow-inner">
+                  <QRCodeGenerator
+                    value={selectedBooking.qrCode}
+                    eventTitle={selectedBooking.eventTitle}
+                    size={qrSize}
+                    showDownload={true}
+                  />
+                  {selectedBooking.status !== 'confirmed' && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl bg-white/80 text-center px-6">
+                      <p className="font-semibold text-gray-800 mb-1">QR Code Inactive</p>
+                      <p className="text-sm text-gray-600">
+                        {selectedBooking.status === 'used'
+                          ? 'This ticket was already redeemed at the entrance.'
+                          : 'Cancelled tickets cannot be scanned at the venue.'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-6 rounded-xl bg-yellow-50 border border-yellow-200 text-center text-sm text-yellow-800">
+                  QR codes will be attached to your tickets once the backend upgrade that adds QR support is deployed.
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-xl bg-gray-50 p-4 text-sm text-gray-600 space-y-1">
+              <p className="font-semibold text-gray-800">Need to know</p>
+              <p>• Each QR code is tied to this booking and works once.</p>
+              <p>• Event staff scan the code to mark you as checked in.</p>
+              <p>• Attempting to reuse an already scanned code will be rejected instantly.</p>
+            </div>
           </div>
         </Modal>
       )}

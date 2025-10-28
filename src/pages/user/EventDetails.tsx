@@ -144,9 +144,12 @@ export function EventDetails() {
     <div className="min-h-screen bg-gray-50">
       {/* Success Message */}
       {showSuccess && (
-        <div className="fixed top-20 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-2 z-50 animate-slide-up">
-          <Check className="w-5 h-5" />
-          <span className="font-semibold">Booking Successful!</span>
+        <div className="fixed top-20 right-4 bg-green-500 text-white px-6 py-4 rounded-lg shadow-lg flex items-center space-x-3 z-50 animate-slide-up">
+          <Check className="w-5 h-5 flex-shrink-0" />
+          <div className="text-sm">
+            <p className="font-semibold leading-tight">Booking confirmed!</p>
+            <p className="opacity-90">Your QR ticket is ready under My Bookings.</p>
+          </div>
         </div>
       )}
 

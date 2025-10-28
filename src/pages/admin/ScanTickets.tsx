@@ -134,9 +134,9 @@ export function ScanTickets() {
       if (booking.status === 'used') {
         setScanResult({
           success: false,
-          message: `Ticket already used${
+          message: `This QR code was already used${
             usedAtValue ? ` at ${new Date(usedAtValue).toLocaleString()}` : ''
-          }`,
+          }. Each ticket only scans once.`,
           booking: {
             eventTitle: booking.eventTitle,
             userName: booking.userName,
@@ -152,7 +152,7 @@ export function ScanTickets() {
       if (booking.status === 'cancelled') {
         setScanResult({
           success: false,
-          message: 'Ticket has been cancelled',
+          message: 'This ticket was cancelled. Ask the guest to confirm their booking.',
           booking: {
             eventTitle: booking.eventTitle,
             userName: booking.userName,
@@ -173,7 +173,7 @@ export function ScanTickets() {
 
       setScanResult({
         success: true,
-        message: 'Ticket validated successfully! ✓',
+        message: 'Ticket validated successfully. This QR code is now marked as used.',
         booking: {
           eventTitle: booking.eventTitle,
           userName: booking.userName,
