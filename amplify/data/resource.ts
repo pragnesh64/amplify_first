@@ -36,8 +36,9 @@ const schema = a.schema({
       createdAt: a.datetime(),
     })
     .authorization((allow) => [
-      allow.authenticated().to(["read"]),
-      allow.owner().to(["create", "update", "delete"]),
+      allow.authenticated().to(["read", "create", "update", "delete"]), // Temporary: allow all authenticated users
+      allow.group("Admin").to(["create", "update", "delete"]),
+      allow.owner().to(["read", "update", "delete"]), // Owner can also update/delete
     ]),
 
   Booking: a
@@ -49,12 +50,18 @@ const schema = a.schema({
       eventTitle: a.string().required(),
       quantity: a.integer().required(),
       totalPrice: a.float().required(),
-      status: a.string().required().default("confirmed"), // "confirmed" or "cancelled"
+      status: a.string().required().default("confirmed"), // "confirmed", "cancelled", or "used"
+      qrCode: a.string(), // Unique QR code for ticket validation
+      usedAt: a.datetime(), // Timestamp when ticket was scanned/used
       createdAt: a.datetime(),
     })
     .authorization((allow) => [
       allow.owner(),
+      allow.group("Admin").to(["read", "update"]),
       allow.authenticated().to(["read"]),
+    ])
+    .secondaryIndexes((index) => [
+      index("qrCode"), // Add GSI for QR code validation
     ]),
 });
 
